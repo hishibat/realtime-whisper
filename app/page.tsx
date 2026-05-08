@@ -185,10 +185,13 @@ export default function Home() {
       streamRef.current = stream;
 
       // 3. WebSocket. OpenAI-specific browser auth via subprotocol.
+      // NOTE: Do NOT add "openai-beta.realtime-v1" — the Realtime API has
+      // graduated to GA. Including the beta marker triggers
+      // invalid_request_error.api_version_mismatch (code 4000) because
+      // /v1/realtime/client_secrets now issues GA-tier ephemeral keys.
       const ws = new WebSocket("wss://api.openai.com/v1/realtime", [
         "realtime",
         `openai-insecure-api-key.${ephemeralKey}`,
-        "openai-beta.realtime-v1",
       ]);
       wsRef.current = ws;
 
