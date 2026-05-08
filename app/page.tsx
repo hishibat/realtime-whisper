@@ -10,6 +10,50 @@ const PLACEHOLDER: Record<Lang, string> = {
   en: "Live transcript will appear here. Press Start to begin.",
 };
 
+const TARGET_SAMPLE_RATE = 24000;
+
+function floatTo16BitPCM(input: Float32Array): Int16Array {
+  const out = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    let s = Math.max(-1, Math.min(1, input[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
+function downsampleTo24k(buffer: Float32Array, fromRate: number): Float32Array {
+  if (fromRate === TARGET_SAMPLE_RATE) return buffer;
+  const ratio = fromRate / TARGET_SAMPLE_RATE;
+  const newLen = Math.floor(buffer.length / ratio);
+  const out = new Float32Array(newLen);
+  let sum = 0;
+  let count = 0;
+  let nextBoundary = ratio;
+  let outIdx = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    sum += buffer[i];
+    count++;
+    if (i + 1 >= nextBoundary) {
+      out[outIdx++] = count > 0 ? sum / count : 0;
+      if (outIdx >= newLen) break;
+      sum = 0;
+      count = 0;
+      nextBoundary += ratio;
+    }
+  }
+  return out;
+}
+
+function int16ToBase64(int16: Int16Array): string {
+  const bytes = new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 export default function Home() {
   const [status, setStatus] = useState<Status>("idle");
   const [language, setLanguage] = useState<Lang>("ja");
@@ -19,8 +63,10 @@ export default function Home() {
   const [fontSize, setFontSize] = useState<number>(18);
   const [toast, setToast] = useState<string | null>(null);
 
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dcRef = useRef<RTCDataChannel | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const partialMapRef = useRef<Map<string, string>>(new Map());
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -33,30 +79,35 @@ export default function Home() {
 
   const teardown = useCallback(() => {
     try {
-      dcRef.current?.close();
+      processorRef.current?.disconnect();
     } catch {}
     try {
-      pcRef.current?.getSenders().forEach((s) => s.track && s.track.stop());
+      sourceRef.current?.disconnect();
     } catch {}
     try {
-      pcRef.current?.close();
+      audioCtxRef.current?.close();
+    } catch {}
+    try {
+      wsRef.current?.close();
     } catch {}
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    pcRef.current = null;
-    dcRef.current = null;
+    processorRef.current = null;
+    sourceRef.current = null;
+    audioCtxRef.current = null;
+    wsRef.current = null;
     streamRef.current = null;
     partialMapRef.current.clear();
     setPartial("");
   }, []);
 
-  const handleEvent = useCallback((evt: any) => {
+  const handleEvent = useCallback((evt: { type?: string; [k: string]: unknown }) => {
     if (!evt || typeof evt !== "object") return;
-    const type: string = evt.type || "";
+    const type = (evt.type as string) || "";
 
     if (type.endsWith("input_audio_transcription.delta")) {
-      const id: string = evt.item_id || "default";
+      const id = (evt.item_id as string) || "default";
       const prev = partialMapRef.current.get(id) || "";
-      const next = prev + (evt.delta || "");
+      const next = prev + ((evt.delta as string) || "");
       partialMapRef.current.set(id, next);
       const merged = Array.from(partialMapRef.current.values()).join("");
       setPartial(merged);
@@ -64,9 +115,9 @@ export default function Home() {
     }
 
     if (type.endsWith("input_audio_transcription.completed")) {
-      const id: string = evt.item_id || "default";
-      const transcript: string =
-        (typeof evt.transcript === "string" && evt.transcript) ||
+      const id = (evt.item_id as string) || "default";
+      const transcript =
+        (typeof evt.transcript === "string" && (evt.transcript as string)) ||
         partialMapRef.current.get(id) ||
         "";
       partialMapRef.current.delete(id);
@@ -80,13 +131,15 @@ export default function Home() {
     }
 
     if (type.endsWith("input_audio_transcription.failed")) {
-      const msg = evt?.error?.message || "Transcription failed for one segment.";
+      const errObj = evt.error as { message?: string } | undefined;
+      const msg = errObj?.message || "Transcription failed for one segment.";
       setError((prev) => (prev ? prev + "\n" + msg : msg));
       return;
     }
 
     if (type === "error") {
-      const msg = evt?.error?.message || "Realtime API error.";
+      const errObj = evt.error as { message?: string } | undefined;
+      const msg = errObj?.message || "Realtime API error.";
       setError(msg);
       return;
     }
@@ -97,21 +150,15 @@ export default function Home() {
     setError(null);
     setStatus("connecting");
 
-    // Helper: fetch with explicit step labelling so we know which leg failed.
-    async function fetchStep(step: string, input: RequestInfo, init?: RequestInit) {
+    try {
+      // 1. Get ephemeral key.
+      let r: Response;
       try {
-        return await fetch(input, init);
+        r = await fetch(`/api/session?language=${language}`, { method: "POST" });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`[${step}] network error: ${msg}`);
+        throw new Error(`[session] network error: ${msg}`);
       }
-    }
-
-    try {
-      // 1. Get ephemeral key from our backend.
-      const r = await fetchStep("session", `/api/session?language=${language}`, {
-        method: "POST",
-      });
       if (!r.ok) {
         const t = await r.text();
         throw new Error(`[session] HTTP ${r.status}: ${t}`);
@@ -120,7 +167,7 @@ export default function Home() {
       const ephemeralKey: string | undefined = j.client_secret;
       if (!ephemeralKey) throw new Error("[session] No ephemeral key returned");
 
-      // 2. Acquire mic.
+      // 2. Mic.
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -128,6 +175,7 @@ export default function Home() {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
+            channelCount: 1,
           },
         });
       } catch (e) {
@@ -136,97 +184,95 @@ export default function Home() {
       }
       streamRef.current = stream;
 
-      // 3. Setup peer connection.
-      const pc = new RTCPeerConnection();
-      pcRef.current = pc;
+      // 3. WebSocket. OpenAI-specific browser auth via subprotocol.
+      const ws = new WebSocket("wss://api.openai.com/v1/realtime", [
+        "realtime",
+        `openai-insecure-api-key.${ephemeralKey}`,
+        "openai-beta.realtime-v1",
+      ]);
+      wsRef.current = ws;
 
-      pc.addEventListener("connectionstatechange", () => {
-        const s = pc.connectionState;
-        if (s === "failed" || s === "disconnected" || s === "closed") {
-          if (status !== "stopping") {
-            setStatus((cur) => (cur === "recording" ? "idle" : cur));
-          }
-        }
+      const opened = new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error("[ws] open timeout (8s)")), 8000);
+        ws.addEventListener("open", () => {
+          clearTimeout(t);
+          resolve();
+        });
+        ws.addEventListener("error", () => {
+          clearTimeout(t);
+          reject(new Error("[ws] connection error"));
+        });
       });
 
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-
-      // 4. Data channel for events.
-      const dc = pc.createDataChannel("oai-events");
-      dcRef.current = dc;
-
-      dc.addEventListener("open", () => {
-        try {
-          dc.send(
-            JSON.stringify({
-              type: "session.update",
-              session: {
-                type: "transcription",
-                audio: {
-                  input: {
-                    transcription: {
-                      model: "gpt-realtime-whisper",
-                      language,
-                    },
-                  },
-                },
-              },
-            })
-          );
-        } catch {}
-        setStatus("recording");
-      });
-
-      dc.addEventListener("message", (ev) => {
+      ws.addEventListener("message", (ev) => {
         try {
           const evt = JSON.parse(ev.data);
           handleEvent(evt);
         } catch {}
       });
 
-      dc.addEventListener("close", () => {
-        setStatus((cur) => (cur === "recording" ? "idle" : cur));
+      ws.addEventListener("close", (ev) => {
+        if (ev.code !== 1000 && status !== "stopping") {
+          setError(
+            (prev) =>
+              `[ws] closed code=${ev.code} reason=${ev.reason || "(none)"}` +
+              (prev ? "\n" + prev : "")
+          );
+        }
+        setStatus((cur) => (cur === "recording" || cur === "connecting" ? "idle" : cur));
       });
 
-      // 5. SDP exchange. Wait for ICE gathering to complete first — some
-      // realtime endpoints reject offers without all candidates inlined.
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      await opened;
 
-      if (pc.iceGatheringState !== "complete") {
-        await new Promise<void>((resolve) => {
-          const t = setTimeout(resolve, 1500); // hard cap so we don't hang forever
-          const onChange = () => {
-            if (pc.iceGatheringState === "complete") {
-              clearTimeout(t);
-              pc.removeEventListener("icegatheringstatechange", onChange);
-              resolve();
-            }
-          };
-          pc.addEventListener("icegatheringstatechange", onChange);
-        });
-      }
-
-      const localSdp = pc.localDescription?.sdp || offer.sdp;
-
-      const sdpResp = await fetchStep(
-        "sdp",
-        "https://api.openai.com/v1/realtime/calls",
-        {
-          method: "POST",
-          body: localSdp,
-          headers: {
-            Authorization: `Bearer ${ephemeralKey}`,
-            "Content-Type": "application/sdp",
+      // 4. Send session.update for transcription.
+      ws.send(
+        JSON.stringify({
+          type: "session.update",
+          session: {
+            type: "transcription",
+            audio: {
+              input: {
+                format: { type: "audio/pcm", rate: TARGET_SAMPLE_RATE },
+                transcription: {
+                  model: "gpt-realtime-whisper",
+                  language,
+                },
+              },
+            },
           },
-        }
+        })
       );
-      if (!sdpResp.ok) {
-        const t = await sdpResp.text();
-        throw new Error(`[sdp] HTTP ${sdpResp.status}: ${t}`);
-      }
-      const answerSdp = await sdpResp.text();
-      await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
+      // 5. Audio pipeline: capture, downsample to 24k mono PCM16, base64, send.
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      audioCtxRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      sourceRef.current = source;
+
+      const bufferSize = 4096;
+      const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (e) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const input = e.inputBuffer.getChannelData(0);
+        const downsampled = downsampleTo24k(input, audioCtx.sampleRate);
+        if (downsampled.length === 0) return;
+        const pcm16 = floatTo16BitPCM(downsampled);
+        const b64 = int16ToBase64(pcm16);
+        ws.send(
+          JSON.stringify({ type: "input_audio_buffer.append", audio: b64 })
+        );
+      };
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      setStatus("recording");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
@@ -257,7 +303,6 @@ export default function Home() {
       await navigator.clipboard.writeText(text);
       showToast(language === "ja" ? "コピーしました" : "Copied");
     } catch {
-      // Fallback: textarea + execCommand.
       const ta = document.createElement("textarea");
       ta.value = text;
       ta.style.position = "fixed";
@@ -280,7 +325,6 @@ export default function Home() {
     partialMapRef.current.clear();
   }, []);
 
-  // Auto-scroll transcript to bottom while user hasn't scrolled up.
   useEffect(() => {
     const el = transcriptRef.current;
     if (!el) return;
@@ -296,7 +340,6 @@ export default function Home() {
     autoScrollRef.current = nearBottom;
   }, []);
 
-  // Cleanup on unmount.
   useEffect(() => {
     return () => teardown();
   }, [teardown]);
@@ -316,7 +359,7 @@ export default function Home() {
       <header className="app-header">
         <div>
           <h1>Realtime Whisper</h1>
-          <div className="sub">OpenAI gpt-realtime-whisper · WebRTC streaming</div>
+          <div className="sub">OpenAI gpt-realtime-whisper · WebSocket streaming</div>
         </div>
         <span className={`status-pill ${status}`}>
           <span className="dot" />
@@ -353,7 +396,7 @@ export default function Home() {
             ● {language === "ja" ? "録音開始" : "Start"}
           </button>
         ) : (
-          <button className="btn danger" onClick={stop} disabled={connecting && !recording ? false : false}>
+          <button className="btn danger" onClick={stop}>
             ■ {language === "ja" ? "停止" : "Stop"}
           </button>
         )}
