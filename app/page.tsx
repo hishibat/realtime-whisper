@@ -97,25 +97,43 @@ export default function Home() {
     setError(null);
     setStatus("connecting");
 
+    // Helper: fetch with explicit step labelling so we know which leg failed.
+    async function fetchStep(step: string, input: RequestInfo, init?: RequestInit) {
+      try {
+        return await fetch(input, init);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`[${step}] network error: ${msg}`);
+      }
+    }
+
     try {
       // 1. Get ephemeral key from our backend.
-      const r = await fetch(`/api/session?language=${language}`, { method: "POST" });
+      const r = await fetchStep("session", `/api/session?language=${language}`, {
+        method: "POST",
+      });
       if (!r.ok) {
         const t = await r.text();
-        throw new Error(`Session creation failed (${r.status}): ${t}`);
+        throw new Error(`[session] HTTP ${r.status}: ${t}`);
       }
       const j = await r.json();
       const ephemeralKey: string | undefined = j.client_secret;
-      if (!ephemeralKey) throw new Error("No ephemeral key returned from /api/session");
+      if (!ephemeralKey) throw new Error("[session] No ephemeral key returned");
 
       // 2. Acquire mic.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`[mic] ${msg}`);
+      }
       streamRef.current = stream;
 
       // 3. Setup peer connection.
@@ -138,7 +156,6 @@ export default function Home() {
       dcRef.current = dc;
 
       dc.addEventListener("open", () => {
-        // Reinforce session config (idempotent — also embedded in ephemeral token).
         try {
           dc.send(
             JSON.stringify({
@@ -171,21 +188,42 @@ export default function Home() {
         setStatus((cur) => (cur === "recording" ? "idle" : cur));
       });
 
-      // 5. SDP exchange.
+      // 5. SDP exchange. Wait for ICE gathering to complete first — some
+      // realtime endpoints reject offers without all candidates inlined.
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const sdpResp = await fetch("https://api.openai.com/v1/realtime/calls", {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${ephemeralKey}`,
-          "Content-Type": "application/sdp",
-        },
-      });
+      if (pc.iceGatheringState !== "complete") {
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, 1500); // hard cap so we don't hang forever
+          const onChange = () => {
+            if (pc.iceGatheringState === "complete") {
+              clearTimeout(t);
+              pc.removeEventListener("icegatheringstatechange", onChange);
+              resolve();
+            }
+          };
+          pc.addEventListener("icegatheringstatechange", onChange);
+        });
+      }
+
+      const localSdp = pc.localDescription?.sdp || offer.sdp;
+
+      const sdpResp = await fetchStep(
+        "sdp",
+        "https://api.openai.com/v1/realtime/calls",
+        {
+          method: "POST",
+          body: localSdp,
+          headers: {
+            Authorization: `Bearer ${ephemeralKey}`,
+            "Content-Type": "application/sdp",
+          },
+        }
+      );
       if (!sdpResp.ok) {
         const t = await sdpResp.text();
-        throw new Error(`SDP exchange failed (${sdpResp.status}): ${t}`);
+        throw new Error(`[sdp] HTTP ${sdpResp.status}: ${t}`);
       }
       const answerSdp = await sdpResp.text();
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });

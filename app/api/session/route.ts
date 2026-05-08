@@ -47,14 +47,28 @@ export async function POST(req: NextRequest) {
 
   const body = { session: buildSession(language) };
 
-  const r = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 8000);
+  let r: Response;
+  try {
+    r = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { error: `OpenAI client_secrets fetch failed: ${msg}` },
+      { status: 502 }
+    );
+  }
+  clearTimeout(timer);
 
   const text = await r.text();
   if (!r.ok) {
