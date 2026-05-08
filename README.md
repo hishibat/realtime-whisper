@@ -1,15 +1,31 @@
 # Realtime Whisper
 
-Browser-based realtime speech-to-text powered by OpenAI's `gpt-realtime-whisper` model. Streams microphone audio over WebRTC and renders the transcript live. Works on desktop and mobile — anywhere with HTTPS and a microphone.
+Browser-based realtime speech-to-text powered by OpenAI's `gpt-realtime-whisper` model. Streams microphone audio over WebSocket and renders the transcript live. Works on desktop and mobile — anywhere with HTTPS and a microphone.
 
-## Features
+## Versions
+
+| Route | Version | Notes |
+|---|---|---|
+| `/`   | **v1 (stable)** | Original simple transcript view |
+| `/v2` | **v2 (enhanced)** | v1 + bullet formatting + heuristic speaker coloring + stop preserves in-flight text |
+
+Each page links to the other from its header.
+
+## Common features (v1 + v2)
 
 - **Live transcript** with partial-token previews (gray) and finalized lines (white)
 - **Language toggle** — Japanese / English
 - **Copy all** — copies the full session transcript to clipboard
 - **Resizable transcript area** — drag the bottom-right handle, or use A−/A+ to change font size
 - **Mobile friendly** — single-page responsive layout
-- **No audio is stored** on the app server. The browser exchanges SDP through a Next.js API route only to fetch a short-lived ephemeral token; audio frames go directly browser ⇄ OpenAI over WebRTC.
+- **No audio is stored** on the app server. The Next.js API route only mints a short-lived ephemeral token; audio frames stream directly browser ⇄ OpenAI over WebSocket.
+
+## v2-only features
+
+- **Stop preserves text** — pressing Stop commits any in-flight partial to the final transcript (v1 discards it)
+- **Format mode (整形)** — toggle prefixes each segment with `・` and inserts a blank line between, for readability
+- **Speaker mode (話者)** — toggle that color-codes segments by inferred speaker. Uses a 1.5-second-pause heuristic to guess speaker changes (palette: white / sky-blue / pink). **Note: this is approximate, not real diarization** — true speaker identification needs a separate model (Deepgram, AssemblyAI, pyannote)
+- **Copy honors current modes** — bullets and `[話者A]`-style labels are preserved in the copied text
 
 ## Architecture
 

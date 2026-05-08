@@ -215,6 +215,73 @@ header.app-header .sub {
   font-style: italic;
 }
 
+/* ===== v2-specific styles ===== */
+
+.toolbar.row2 {
+  margin-top: -2px;
+  margin-bottom: 12px;
+}
+
+.btn.toggle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b0d10;
+  font-weight: 600;
+}
+
+.ver-link {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--panel);
+  transition: background 0.15s;
+}
+
+.ver-link:hover {
+  background: var(--panel-2);
+}
+
+.transcript .seg {
+  margin: 0;
+}
+
+.transcript.bullets .seg {
+  margin: 0 0 12px;
+}
+
+.transcript.bullets .seg::before {
+  content: "・";
+  margin-right: 2px;
+}
+
+/* Speaker palette (used only when speakerMode is on) */
+.transcript .seg.spk-0 { color: #e8ecf1; }
+.transcript .seg.spk-1 { color: #7dd3fc; }
+.transcript .seg.spk-2 { color: #f9a8d4; }
+
+.transcript .seg .spk-label {
+  display: inline-block;
+  font-size: 0.7em;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  opacity: 0.85;
+  vertical-align: 2px;
+  color: inherit;
+}
+
+.speaker-note-inline {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+  margin-left: 4px;
+}
+
 .footer-bar {
   display: flex;
   justify-content: space-between;

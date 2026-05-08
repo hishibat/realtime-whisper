@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Realtime Whisper — v1 / v2 UI モックアップ</title>
+<style>
+  /* ====== Mockup page chrome (light) ====== */
+  :root {
+    --page-bg: #f4f6fa;
+    --page-text: #1f2933;
+    --page-muted: #5a6473;
+    --page-border: #d8dde6;
+    --page-accent: #2f7ae0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page-bg);
+    color: var(--page-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+  }
+  .page-header h1 {
+    margin: 0 0 8px;
+    font-size: 24px;
+  }
+  .page-header p {
+    margin: 0 0 20px;
+    color: var(--page-muted);
+    font-size: 14px;
+  }
+  .legend {
+    background: #fff;
+    border: 1px solid var(--page-border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+  }
+  .legend h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+  .legend ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+  }
+  .legend li { margin-bottom: 4px; }
+  .legend strong { color: var(--page-accent); }
+
+  .section {
+    background: #fff;
+    border: 1px solid var(--page-border);
+    border-radius: 12px;
+    padding: 18px 20px 22px;
+    margin-bottom: 24px;
+  }
+  .section.highlight {
+    border-color: var(--page-accent);
+    box-shadow: 0 0 0 3px rgba(47,122,224,0.15);
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .section-head h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .section-head .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.before { background: #eef0f4; color: #4a5260; }
+  .badge.after  { background: #2f7ae0; color: #fff; }
+  .badge.star   { background: #f59e0b; color: #fff; }
+  .section-head .note {
+    color: var(--page-muted);
+    font-size: 13px;
+  }
+
+  /* ====== App theme (mirrors globals.css) ====== */
+  .app {
+    --bg: #0b0d10;
+    --panel: #14181d;
+    --panel-2: #1b2027;
+    --border: #2a313a;
+    --text: #e8ecf1;
+    --muted: #8a94a3;
+    --accent: #4f9cff;
+    --accent-strong: #2f7ae0;
+    --danger: #e25c5c;
+
+    background: var(--bg);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 20px;
+    font-feature-settings: "palt";
+  }
+  .app .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .app .app-header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .app .app-header .sub {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .app .ver-link {
+    color: var(--accent);
+    font-size: 12px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: var(--panel);
+  }
+  .app .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .app .status-pill .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .app .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .app .toolbar.row2 { margin-bottom: 12px; }
+  .app .btn {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .app .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0b0d10;
+    font-weight: 600;
+  }
+  .app .btn.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    font-weight: 600;
+  }
+  .app .btn.toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0b0d10;
+    font-weight: 600;
+  }
+  .app .lang-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .app .lang-toggle button {
+    background: var(--panel);
+    color: var(--muted);
+    border: 0;
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .app .lang-toggle button.active {
+    background: var(--accent);
+    color: #0b0d10;
+    font-weight: 600;
+  }
+  .app .transcript-wrap {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .app .transcript {
+    width: 100%;
+    height: 240px;
+    overflow: auto;
+    padding: 16px 18px;
+    background: var(--panel);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.6;
+    font-size: 17px;
+    color: var(--text);
+  }
+  .app .transcript.tall { height: 340px; }
+  .app .transcript .partial {
+    color: var(--muted);
+  }
+  .app .transcript .seg {
+    margin: 0;
+  }
+  .app .transcript.bullets .seg {
+    margin: 0 0 12px;
+  }
+  .app .transcript.bullets .seg::before {
+    content: "・";
+    margin-right: 2px;
+  }
+  /* speaker palette */
+  .app .transcript .seg.spk-0 { color: #e8ecf1; }
+  .app .transcript .seg.spk-1 { color: #7dd3fc; }
+  .app .transcript .seg.spk-2 { color: #f9a8d4; }
+  .app .transcript .seg .spk-label {
+    display: inline-block;
+    font-size: 11px;
+    margin-right: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    opacity: 0.85;
+    vertical-align: 2px;
+  }
+  .app .footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app .speaker-note {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-style: italic;
+  }
+  .arrow {
+    text-align: center;
+    color: var(--page-muted);
+    font-size: 22px;
+    padding: 6px 0 16px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: #fff;
+    border: 1px solid var(--page-border);
+    border-radius: 12px;
+    padding: 14px 16px 16px;
+  }
+  .panel.highlight {
+    border-color: var(--page-accent);
+    box-shadow: 0 0 0 3px rgba(47,122,224,0.15);
+  }
+  .panel-head {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--page-text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-head .pill {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #eef0f4;
+    color: #4a5260;
+  }
+  .panel-head .pill.on { background: #4f9cff; color: #fff; }
+  .panel-head .star { color: #f59e0b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-header">
+    <h1>Realtime Whisper — v1 / v2 UI モックアップ</h1>
+    <p>4パターンを静的に並べました。特に最後の <strong>「整形ON / 話者ON」</strong> を確認してください。</p>
+  </div>
+
+  <div class="legend">
+    <h3>v2で追加する要素（v1は据え置き）</h3>
+    <ul>
+      <li><strong>停止しても文字が消えない</strong> — in-flight partial を停止時に確定保存</li>
+      <li><strong>整形モード</strong> — OFF (現行) / 箇条書き (・付き＋空行)</li>
+      <li><strong>話者モード</strong> — OFF (単色) / ON (発話間隔1.5秒以上で話者交代と推定し色分け＋ラベル)</li>
+      <li><strong>v1 ⇄ v2 リンク</strong> — どちらのページからも切替可能</li>
+      <li><strong>性能保証</strong> — 音声パイプラインは無変更。表示レイヤーのみの追加</li>
+    </ul>
+  </div>
+
+  <!-- ============== BEFORE ============== -->
+  <div class="section">
+    <div class="section-head">
+      <h2>Before — v1 (現行、据え置き)</h2>
+      <span class="badge before">No change</span>
+    </div>
+
+    <div class="app">
+      <div class="app-header">
+        <div>
+          <h1>Realtime Whisper</h1>
+          <div class="sub">OpenAI gpt-realtime-whisper · WebSocket streaming</div>
+        </div>
+        <span class="status-pill"><span class="dot"></span>録音中</span>
+      </div>
+
+      <div class="toolbar">
+        <div class="lang-toggle">
+          <button class="active">日本語</button>
+          <button>English</button>
+        </div>
+        <button class="btn danger">■ 停止</button>
+        <button class="btn">全文コピー</button>
+        <button class="btn">クリア</button>
+        <div style="flex:1"></div>
+        <button class="btn">A−</button>
+        <button class="btn">A+</button>
+      </div>
+
+      <div class="transcript-wrap">
+        <div class="transcript"><div class="seg">こんにちは、今日はリアルタイム文字起こしのテストをしています。</div><div class="seg">システムはちゃんと動いていますね。</div><div class="seg">では、こちらから質問させていただきます。</div><div class="seg">最近の進捗はいかがでしょうか。</div><div class="seg">先週末に大きな問題を解決しました。</div><div class="seg">今は次のフェーズに進んでいます。</div><span class="partial">実装の詳細はまた共有します...</span></div>
+      </div>
+
+      <div class="footer-bar">
+        <span>右下のハンドルでサイズ変更 / 文字数: 142</span>
+        <span>音声はOpenAIへ直接送信され、サーバーには保存されません。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">▼</div>
+
+  <!-- ============== AFTER: 4 patterns ============== -->
+  <div class="section">
+    <div class="section-head">
+      <h2>After — v2 (新規ルート /v2)</h2>
+      <span class="badge after">v0.2.0</span>
+      <span class="note">4パターン全て静的に表示しています</span>
+    </div>
+
+    <!-- Pattern 1: OFF/OFF -->
+    <div class="panel" style="margin-bottom:18px;">
+      <div class="panel-head">
+        パターン①: 整形 <span class="pill">OFF</span> 話者 <span class="pill">OFF</span>
+        <span style="margin-left:auto; color:var(--page-muted); font-size:12px;">≒ v1と同じ表示</span>
+      </div>
+      <div class="app">
+        <div class="toolbar">
+          <div class="lang-toggle"><button class="active">日本語</button><button>English</button></div>
+          <button class="btn danger">■ 停止</button>
+          <button class="btn">全文コピー</button>
+          <button class="btn">クリア</button>
+        </div>
+        <div class="toolbar row2">
+          <button class="btn toggle">整形: OFF</button>
+          <button class="btn toggle">話者: OFF</button>
+        </div>
+        <div class="transcript-wrap">
+          <div class="transcript" id="p1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pattern 2: ON/OFF -->
+    <div class="panel" style="margin-bottom:18px;">
+      <div class="panel-head">
+        パターン②: 整形 <span class="pill on">ON (箇条書き)</span> 話者 <span class="pill">OFF</span>
+        <span style="margin-left:auto; color:var(--page-muted); font-size:12px;">「・」付き＋空行</span>
+      </div>
+      <div class="app">
+        <div class="toolbar">
+          <div class="lang-toggle"><button class="active">日本語</button><button>English</button></div>
+          <button class="btn danger">■ 停止</button>
+          <button class="btn">全文コピー</button>
+          <button class="btn">クリア</button>
+        </div>
+        <div class="toolbar row2">
+          <button class="btn toggle on">整形: 箇条書き</button>
+          <button class="btn toggle">話者: OFF</button>
+        </div>
+        <div class="transcript-wrap">
+          <div class="transcript bullets" id="p2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pattern 3: OFF/ON -->
+    <div class="panel" style="margin-bottom:18px;">
+      <div class="panel-head">
+        整形 <span class="pill">OFF</span> 話者 <span class="pill on">ON</span>
+        <span style="margin-left:auto; color:var(--page-muted); font-size:12px;">話者ごとに色分け＋A/B/Cラベル</span>
+      </div>
+      <div class="app">
+        <div class="toolbar">
+          <div class="lang-toggle"><button class="active">日本語</button><button>English</button></div>
+          <button class="btn danger">■ 停止</button>
+          <button class="btn">全文コピー</button>
+          <button class="btn">クリア</button>
+        </div>
+        <div class="toolbar row2">
+          <button class="btn toggle">整形: OFF</button>
+          <button class="btn toggle on">話者: ON</button>
+        </div>
+        <div class="transcript-wrap">
+          <div class="transcript" id="p3"></div>
+        </div>
+        <div class="speaker-note">
+          ※ 発話間隔1.5秒以上を「話者交代」と推定する近似処理（本物の話者識別ではありません）
+        </div>
+      </div>
+    </div>
+
+    <!-- Pattern 4: ON/ON ★ -->
+    <div class="panel highlight">
+      <div class="panel-head">
+        <span class="star">★</span> パターン④: 整形 <span class="pill on">ON (箇条書き)</span> 話者 <span class="pill on">ON</span>
+        <span style="margin-left:auto; color:var(--page-accent); font-size:12px; font-weight:600;">最も読みやすいモード</span>
+      </div>
+      <div class="app">
+        <div class="app-header">
+          <div>
+            <h1>Realtime Whisper <span style="color:var(--muted); font-size:12px; font-weight:400;">v2</span></h1>
+            <div class="sub">OpenAI gpt-realtime-whisper · WebSocket streaming</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <a href="#" class="ver-link">→ v1へ</a>
+            <span class="status-pill"><span class="dot"></span>録音中</span>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="lang-toggle"><button class="active">日本語</button><button>English</button></div>
+          <button class="btn danger">■ 停止</button>
+          <button class="btn">全文コピー</button>
+          <button class="btn">クリア</button>
+          <div style="flex:1"></div>
+          <button class="btn">A−</button>
+          <button class="btn">A+</button>
+        </div>
+        <div class="toolbar row2">
+          <button class="btn toggle on">整形: 箇条書き</button>
+          <button class="btn toggle on">話者: ON</button>
+        </div>
+        <div class="transcript-wrap">
+          <div class="transcript bullets tall" id="p4"></div>
+        </div>
+        <div class="footer-bar">
+          <span>右下のハンドルでサイズ変更 / 文字数: 142</span>
+          <span>音声はOpenAIへ直接送信され、サーバーには保存されません。</span>
+        </div>
+        <div class="speaker-note">
+          ※ 話者モードは発話間隔1.5秒以上を「話者交代」と推定する近似処理（本物の話者識別ではありません）
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend" style="margin-top: 28px;">
+    <h3>コピー時の挙動（参考）</h3>
+    <table style="border-collapse: collapse; font-size:13px; width:100%;">
+      <tr style="background:#eef0f4;">
+        <th style="border:1px solid var(--page-border); padding:6px 12px; text-align:left;">表示モード</th>
+        <th style="border:1px solid var(--page-border); padding:6px 12px; text-align:left;">「全文コピー」で得られるテキスト</th>
+      </tr>
+      <tr>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; vertical-align:top;">①OFF / OFF</td>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; white-space:pre-wrap; font-family:Consolas,monospace; font-size:12px;">こんにちは、今日はリアルタイム文字起こしのテストをしています。
+システムはちゃんと動いていますね。
+では、こちらから質問させていただきます。
+…</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; vertical-align:top;">②ON / OFF</td>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; white-space:pre-wrap; font-family:Consolas,monospace; font-size:12px;">・こんにちは、今日はリアルタイム文字起こしのテストをしています。
+
+・システムはちゃんと動いていますね。
+
+・では、こちらから質問させていただきます。
+…</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; vertical-align:top;">③OFF / ON</td>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; white-space:pre-wrap; font-family:Consolas,monospace; font-size:12px;">[話者A] こんにちは、今日はリアルタイム文字起こしのテストをしています。
+[話者A] システムはちゃんと動いていますね。
+[話者B] では、こちらから質問させていただきます。
+…</td>
+      </tr>
+      <tr style="background:#fff8e6;">
+        <td style="border:1px solid var(--page-border); padding:6px 12px; vertical-align:top;">★④ON / ON</td>
+        <td style="border:1px solid var(--page-border); padding:6px 12px; white-space:pre-wrap; font-family:Consolas,monospace; font-size:12px;">・[話者A] こんにちは、今日はリアルタイム文字起こしのテストをしています。
+・[話者A] システムはちゃんと動いていますね。
+
+・[話者B] では、こちらから質問させていただきます。
+・[話者B] 最近の進捗はいかがでしょうか。
+
+・[話者C] 先週末に大きな問題を解決しました。
+・[話者C] 今は次のフェーズに進んでいます。</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  // Sample transcription data with inter-segment timing.
+  // gapMs >= 1500 -> speaker change.
+  const segments = [
+    { text: "こんにちは、今日はリアルタイム文字起こしのテストをしています。", gapMs: 0 },
+    { text: "システムはちゃんと動いていますね。",                              gapMs: 800 },
+    { text: "では、こちらから質問させていただきます。",                        gapMs: 2000 },
+    { text: "最近の進捗はいかがでしょうか。",                                  gapMs: 600 },
+    { text: "先週末に大きな問題を解決しました。",                              gapMs: 1800 },
+    { text: "今は次のフェーズに進んでいます。",                                gapMs: 700 },
+  ];
+  const partial = "実装の詳細はまた共有します...";
+
+  function assignSpeakers(segs) {
+    let spk = 0;
+    return segs.map((s, i) => {
+      if (i > 0 && s.gapMs >= 1500) spk = (spk + 1) % 3;
+      return Object.assign({}, s, { spk });
+    });
+  }
+  const enriched = assignSpeakers(segments);
+
+  function escape(s) {
+    return String(s).replace(/[&<>]/g, function(c){
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c];
+    });
+  }
+
+  function renderInto(targetId, formatOn, speakerOn) {
+    const el = document.getElementById(targetId);
+    let html = "";
+    enriched.forEach(function(s){
+      const cls = ['seg'];
+      if (speakerOn) cls.push('spk-' + s.spk);
+      const label = speakerOn
+        ? '<span class="spk-label">話者' + String.fromCharCode(65 + s.spk) + '</span>'
+        : '';
+      html += '<div class="' + cls.join(' ') + '">' + label + escape(s.text) + '</div>';
+    });
+    html += '<span class="partial">' + escape(partial) + '</span>';
+    el.innerHTML = html;
+  }
+
+  renderInto('p1', false, false);
+  renderInto('p2', true,  false);
+  renderInto('p3', false, true);
+  renderInto('p4', true,  true);
+</script>
+</body>
+</html>
