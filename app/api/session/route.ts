@@ -6,6 +6,9 @@ export const dynamic = "force-dynamic";
 type Lang = "ja" | "en";
 
 function buildSession(language: Lang) {
+  // Note: gpt-realtime-whisper rejects `turn_detection` — segmentation is
+  // handled internally by the model. Only the speech-to-speech `gpt-realtime`
+  // model accepts turn_detection.
   return {
     type: "transcription",
     audio: {
@@ -13,12 +16,6 @@ function buildSession(language: Lang) {
         transcription: {
           model: "gpt-realtime-whisper",
           language,
-        },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500,
         },
       },
     },
