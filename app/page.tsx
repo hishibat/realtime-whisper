@@ -138,9 +138,26 @@ export default function Home() {
     }
 
     if (type === "error") {
-      const errObj = evt.error as { message?: string } | undefined;
-      const msg = errObj?.message || "Realtime API error.";
-      setError(msg);
+      const errObj = evt.error as { message?: string; code?: string; type?: string } | undefined;
+      const raw = errObj?.message || "Realtime API error.";
+      const code = errObj?.code || "";
+      const isQuota =
+        code === "insufficient_quota" ||
+        /exceeded your current quota/i.test(raw) ||
+        /quota/i.test(code);
+      if (isQuota) {
+        setError(
+          "OpenAIのクォータ不足です (insufficient_quota)。\n" +
+            "考えられる原因と対処（上から順に確認推奨）:\n" +
+            "1) Project単位の月次予算が$0のまま → https://platform.openai.com/settings/organization/projects で該当projectを開き Limits → Monthly budget を$10以上に設定\n" +
+            "2) APIキーが Credit を入れた組織と別orgに属している → 右上のorg切替で確認\n" +
+            "3) クレジット反映遅延 → 5〜15分待って再試行\n" +
+            "\n生メッセージ: " +
+            raw
+        );
+      } else {
+        setError(raw);
+      }
       return;
     }
   }, []);
