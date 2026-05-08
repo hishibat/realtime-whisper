@@ -88,7 +88,9 @@ export default function Home() {
       audioCtxRef.current?.close();
     } catch {}
     try {
-      wsRef.current?.close();
+      // Send a normal-close (1000) so the server sees a graceful shutdown
+      // and the browser doesn't synthesize the 1005 "no status" placeholder.
+      wsRef.current?.close(1000, "client stop");
     } catch {}
     streamRef.current?.getTracks().forEach((t) => t.stop());
     processorRef.current = null;
@@ -232,7 +234,11 @@ export default function Home() {
       });
 
       ws.addEventListener("close", (ev) => {
-        if (ev.code !== 1000 && status !== "stopping") {
+        // 1000 = explicit normal close; 1005 = no status received (browser
+        // synthesizes this when our own ws.close() ran without a code, or
+        // the server closed without a frame). Both are benign.
+        const benign = ev.code === 1000 || ev.code === 1005;
+        if (!benign) {
           setError(
             (prev) =>
               `[ws] closed code=${ev.code} reason=${ev.reason || "(none)"}` +
