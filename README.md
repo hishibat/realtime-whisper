@@ -31,7 +31,7 @@ Each page links to the other from its header.
 
 ```
 Browser  ──── POST /api/session ────▶  Next.js (server)  ──── POST /v1/realtime/client_secrets ────▶  OpenAI
-   │                                        │   (uses OPENAI_API_KEY)
+   │      (x-app-password header)           │   (verifies APP_PASSWORD; uses OPENAI_API_KEY)
    │◀──── ephemeral key ────────────────────┘
    │
    │ POST /v1/realtime/calls (SDP offer, Bearer ephemeral key)
@@ -48,18 +48,27 @@ Requires Node 20+.
 
 ```bash
 npm install
-cp .env.example .env.local         # fill in OPENAI_API_KEY
+cp .env.example .env.local         # fill in OPENAI_API_KEY and APP_PASSWORD
 npm run dev
 # open http://localhost:3000
 ```
 
 Microphone permission requires either `localhost` or HTTPS — the dev server is fine.
 
+## Access control (passphrase)
+
+The deployed URL is reachable from the public internet, so `/api/session` is gated by a shared passphrase to prevent anonymous visitors from burning your OpenAI quota.
+
+- Set `APP_PASSWORD` to a long random string (e.g. `openssl rand -base64 24`) once in Vercel **Project Settings → Environment Variables**, then redeploy. No CLI required.
+- On first visit, each browser shows a setup screen asking for the passphrase and stores it in `localStorage` — used permanently on that device, no re-entry needed
+- A wrong or missing passphrase makes `/api/session` return 401 and **OpenAI is never called** — no quota is consumed
+- To revoke access, change `APP_PASSWORD` in Vercel and redeploy; every device will be forced to re-enter on next request
+
 ## Deploy to Vercel (one click)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhishibat%2Frealtime-whisper&env=OPENAI_API_KEY&envDescription=OpenAI%20API%20key%20with%20access%20to%20gpt-realtime-whisper&project-name=realtime-whisper&repository-name=realtime-whisper)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhishibat%2Frealtime-whisper&env=OPENAI_API_KEY,APP_PASSWORD&envDescription=OPENAI_API_KEY%20%3D%20OpenAI%20key%20with%20gpt-realtime-whisper%20access.%20APP_PASSWORD%20%3D%20long%20random%20string%20gating%20%2Fapi%2Fsession.&project-name=realtime-whisper&repository-name=realtime-whisper)
 
-After the deploy, set `OPENAI_API_KEY` in **Project Settings → Environment Variables** (the wizard asks for it during the clone). The deployed URL works on company laptops and mobile devices that allow microphone access on HTTPS.
+After the deploy, set `OPENAI_API_KEY` **and** `APP_PASSWORD` in **Project Settings → Environment Variables** (the wizard asks for both during the clone). The deployed URL works on company laptops and mobile devices that allow microphone access on HTTPS.
 
 ## Tech
 

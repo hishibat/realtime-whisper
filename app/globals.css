@@ -344,3 +344,90 @@ header.app-header .sub {
     padding: 10px 14px;
   }
 }
+
+/* PasswordGate (first-run setup screen) */
+.gate-loading {
+  color: var(--muted);
+  text-align: center;
+  padding: 48px 0;
+  font-size: 14px;
+}
+
+.gate-card {
+  max-width: 440px;
+  margin: 8vh auto 0;
+  padding: 28px 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.gate-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  letter-spacing: 0.01em;
+}
+
+.gate-desc {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gate-input {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: 16px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  outline: none;
+}
+
+.gate-input:focus {
+  border-color: var(--accent);
+}
+
+.gate-submit {
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent-strong);
+  border: 1px solid var(--accent-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.gate-submit:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.gate-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gate-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+
+.gate-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 16px 0 0;
+}

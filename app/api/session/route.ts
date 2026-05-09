@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Lang = "ja" | "en";
+
+function checkPassword(req: NextRequest): NextResponse | null {
+  const expected = process.env.APP_PASSWORD;
+  if (!expected) {
+    return NextResponse.json(
+      { error: "APP_PASSWORD is not set on the server. Refusing to mint tokens." },
+      { status: 500 }
+    );
+  }
+  const supplied = req.headers.get("x-app-password") ?? "";
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(expected);
+  const ok = a.length === b.length && timingSafeEqual(a, b);
+  if (!ok) {
+    return NextResponse.json(
+      { error: "Invalid or missing app passphrase." },
+      { status: 401 }
+    );
+  }
+  return null;
+}
 
 function buildSession(language: Lang) {
   // Note: gpt-realtime-whisper rejects `turn_detection` — segmentation is
@@ -33,6 +55,9 @@ function extractEphemeralKey(data: unknown): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = checkPassword(req);
+  if (authError) return authError;
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

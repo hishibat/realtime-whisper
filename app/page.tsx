@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth";
 
 type Status = "idle" | "connecting" | "recording" | "stopping" | "error";
 type Lang = "ja" | "en";
@@ -173,10 +174,13 @@ export default function Home() {
       // 1. Get ephemeral key.
       let r: Response;
       try {
-        r = await fetch(`/api/session?language=${language}`, { method: "POST" });
+        r = await authFetch(`/api/session?language=${language}`, { method: "POST" });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`[session] network error: ${msg}`);
+      }
+      if (r.status === 401) {
+        throw new Error("[session] Unauthorized — please re-enter the passphrase.");
       }
       if (!r.ok) {
         const t = await r.text();
